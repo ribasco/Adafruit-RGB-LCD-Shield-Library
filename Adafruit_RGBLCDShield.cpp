@@ -52,30 +52,12 @@
 // RGBLCDShield constructor is called).
 
 Adafruit_RGBLCDShield::Adafruit_RGBLCDShield() {
-  _i2cAddr = 0;
-
-  _displayfunction = LCD_4BITMODE | LCD_1LINE | LCD_5x8DOTS;
-
-  // the I/O expander pinout
-  _rs_pin = 15;
-  _rw_pin = 255; //14;
-  _enable_pin = 13;
-  _data_pins[0] = 12;  // really d4
-  _data_pins[1] = 11;  // really d5
-  _data_pins[2] = 10;  // really d6
-  _data_pins[3] = 9;  // really d7
-
-  _button_pins[0] = 0;
-  _button_pins[1] = 1;
-  _button_pins[2] = 2;
-  _button_pins[3] = 3;
-  _button_pins[4] = 4;
-  // we can't begin() yet :(
+  init(1, 15, 255, 13, 12, 11, 10, 9, 0, 0, 0, 0);
 }
 
 void Adafruit_RGBLCDShield::init(uint8_t fourbitmode, uint8_t rs, uint8_t rw, uint8_t enable,
-			 uint8_t d0, uint8_t d1, uint8_t d2, uint8_t d3,
-			 uint8_t d4, uint8_t d5, uint8_t d6, uint8_t d7)
+       uint8_t d0, uint8_t d1, uint8_t d2, uint8_t d3,
+       uint8_t d4, uint8_t d5, uint8_t d6, uint8_t d7)
 {
   _rs_pin = rs;
   _rw_pin = rw;
@@ -90,22 +72,18 @@ void Adafruit_RGBLCDShield::init(uint8_t fourbitmode, uint8_t rs, uint8_t rw, ui
   _data_pins[6] = d6;
   _data_pins[7] = d7;
 
-  _i2cAddr = 255;
+  _button_pins[0] = 0;
+  _button_pins[1] = 1;
+  _button_pins[2] = 2;
+  _button_pins[3] = 3;
+  _button_pins[4] = 4;
 
-  _pinMode(_rs_pin, OUTPUT);
-  // we can save 1 pin by not using RW. Indicate by passing 255 instead of pin#
-  if (_rw_pin != 255) {
-    _pinMode(_rw_pin, OUTPUT);
-  }
-  _pinMode(_enable_pin, OUTPUT);
-
+  _i2cAddr = 0;
 
   if (fourbitmode)
     _displayfunction = LCD_4BITMODE | LCD_1LINE | LCD_5x8DOTS;
   else
     _displayfunction = LCD_8BITMODE | LCD_1LINE | LCD_5x8DOTS;
-
-  begin(16, 1);
 }
 
 void Adafruit_RGBLCDShield::begin(uint8_t cols, uint8_t lines, uint8_t i2caddr, uint8_t dotsize) {
