@@ -47,10 +47,6 @@
 //    I/D = 1; Increment by 1
 //    S = 0; No shift
 //
-// Note, however, that resetting the Arduino doesn't reset the LCD, so we
-// can't assume that its in that state when a sketch starts (and the
-// RGBLCDShield constructor is called).
-
 Adafruit_RGBLCDShield::Adafruit_RGBLCDShield() {
   init(1, 15, 255, 13, 12, 11, 10, 9, 0, 0, 0, 0);
 }
@@ -63,22 +59,16 @@ void Adafruit_RGBLCDShield::init(uint8_t fourbitmode, uint8_t rs, uint8_t rw, ui
   _rw_pin = rw;
   _enable_pin = enable;
 
-  _data_pins[0] = d0;
-  _data_pins[1] = d1;
-  _data_pins[2] = d2;
-  _data_pins[3] = d3;
+  _data_pins[0] = d0; //LCD = D4, DEFAULT PIN = 12
+  _data_pins[1] = d1; //LCD = D5, DEFAULT PIN = 11
+  _data_pins[2] = d2; //LCD = D6, DEFAULT PIN = 10
+  _data_pins[3] = d3; //LCD = D7, DEFAULT PIN = 9
   _data_pins[4] = d4;
   _data_pins[5] = d5;
   _data_pins[6] = d6;
   _data_pins[7] = d7;
 
-  _button_pins[0] = 0;
-  _button_pins[1] = 1;
-  _button_pins[2] = 2;
-  _button_pins[3] = 3;
-  _button_pins[4] = 4;
-
-  _i2cAddr = 0;
+  _i2cAddr = 255;
 
   if (fourbitmode)
     _displayfunction = LCD_4BITMODE | LCD_1LINE | LCD_5x8DOTS;
@@ -86,10 +76,20 @@ void Adafruit_RGBLCDShield::init(uint8_t fourbitmode, uint8_t rs, uint8_t rw, ui
     _displayfunction = LCD_8BITMODE | LCD_1LINE | LCD_5x8DOTS;
 }
 
-void Adafruit_RGBLCDShield::begin(uint8_t cols, uint8_t lines, uint8_t i2caddr, uint8_t dotsize) {
-  _i2cAddr = i2caddr;
-  Serial.print("LCD using I2C Addr: ");
-  Serial.println(_i2cAddr, 1);
+void Adafruit_RGBLCDShield::setI2CInterface(Adafruit_MCP23017* i2c)
+{
+  _i2c = i2c;
+  _i2cAddr = 0;
+  if (!_i2c)
+  {
+    Serial.println("Error: Missing i2c interface");
+    return;
+  }
+}
+
+void Adafruit_RGBLCDShield::begin(uint8_t cols, uint8_t lines, uint8_t dotsize) {
+  _cols = cols;
+  _rows = lines;
 
   // check if i2c
   if (_i2cAddr != 255) {
@@ -97,26 +97,21 @@ void Adafruit_RGBLCDShield::begin(uint8_t cols, uint8_t lines, uint8_t i2caddr, 
     Serial.println(_i2cAddr, 1);
 
     WIRE.begin();
-    _i2c.begin(_i2cAddr);
+    //_i2c->begin(_i2cAddr);
     //_i2c.begin();
 
-    _i2c.pinMode(8, OUTPUT);
-    _i2c.pinMode(6, OUTPUT);
-    _i2c.pinMode(7, OUTPUT);
-    setBacklight(0x7);
+    /*_i2c->pinMode(8, OUTPUT);
+    _i2c->pinMode(6, OUTPUT);
+    _i2c->pinMode(7, OUTPUT);
+    setBacklight(0x7);*/
 
     if (_rw_pin)
-      _i2c.pinMode(_rw_pin, OUTPUT);
+      _i2c->pinMode(_rw_pin, OUTPUT);
 
-    _i2c.pinMode(_rs_pin, OUTPUT);
-    _i2c.pinMode(_enable_pin, OUTPUT);
+    _i2c->pinMode(_rs_pin, OUTPUT);
+    _i2c->pinMode(_enable_pin, OUTPUT);
     for (uint8_t i=0; i<4; i++)
-      _i2c.pinMode(_data_pins[i], OUTPUT);
-
-    for (uint8_t i=0; i<5; i++) {
-      _i2c.pinMode(_button_pins[i], INPUT);
-      _i2c.pullUp(_button_pins[i], 1);
-    }
+      _i2c->pinMode(_data_pins[i], OUTPUT);
   }
 
   if (lines > 1) {
@@ -216,6 +211,16 @@ void Adafruit_RGBLCDShield::setCursor(uint8_t col, uint8_t row)
   command(LCD_SETDDRAMADDR | (col + row_offsets[row]));
 }
 
+void Adafruit_RGBLCDShield::clearLine(uint8_t rowIndex)
+{
+    if(rowIndex <= (_rows-1)){
+        setCursor(0, rowIndex);
+        for (int i=0; i<_cols; i++)
+          print(" ");
+        setCursor(0, rowIndex);
+    }
+}
+
 // Turn the display on/off (quickly)
 void Adafruit_RGBLCDShield::noDisplay() {
   _displaycontrol &= ~LCD_DISPLAYON;
@@ -312,26 +317,18 @@ inline void Adafruit_RGBLCDShield::write(uint8_t value) {
 void  Adafruit_RGBLCDShield::_digitalWrite(uint8_t p, uint8_t d) {
   if (_i2cAddr != 255) {
     // an i2c command
-    _i2c.digitalWrite(p, d);
+    _i2c->digitalWrite(p, d);
   } else {
     // straightup IO
     digitalWrite(p, d);
   }
 }
 
-// Allows to set the backlight, if the LCD backpack is used
-void Adafruit_RGBLCDShield::setBacklight(uint8_t status) {
-  // check if i2c or SPI
-  _i2c.digitalWrite(8, ~(status >> 2) & 0x1);
-  _i2c.digitalWrite(7, ~(status >> 1) & 0x1);
-  _i2c.digitalWrite(6, ~status & 0x1);
-}
-
 // little wrapper for i/o directions
 void  Adafruit_RGBLCDShield::_pinMode(uint8_t p, uint8_t d) {
   if (_i2cAddr != 255) {
     // an i2c command
-    _i2c.pinMode(p, d);
+    _i2c->pinMode(p, d);
   } else {
     // straightup IO
     pinMode(p, d);
@@ -368,7 +365,7 @@ void Adafruit_RGBLCDShield::write4bits(uint8_t value) {
   if (_i2cAddr != 255) {
     uint16_t out = 0;
 
-    out = _i2c.readGPIOAB();
+    out = _i2c->readGPIOAB();
 
     // speed up for i2c since its sluggish
     for (int i = 0; i < 4; i++) {
@@ -379,15 +376,15 @@ void Adafruit_RGBLCDShield::write4bits(uint8_t value) {
     // make sure enable is low
     out &= ~(1 << _enable_pin);
 
-    _i2c.writeGPIOAB(out);
+    _i2c->writeGPIOAB(out);
 
     // pulse enable
     delayMicroseconds(1);
     out |= (1 << _enable_pin);
-    _i2c.writeGPIOAB(out);
+    _i2c->writeGPIOAB(out);
     delayMicroseconds(1);
     out &= ~(1 << _enable_pin);
-    _i2c.writeGPIOAB(out);
+    _i2c->writeGPIOAB(out);
     delayMicroseconds(100);
 
   } else {
@@ -406,13 +403,4 @@ void Adafruit_RGBLCDShield::write8bits(uint8_t value) {
   }
 
   pulseEnable();
-}
-
-uint8_t Adafruit_RGBLCDShield::readButtons(void) {
-  uint8_t reply = 0x1F;
-
-  for (uint8_t i=0; i<5; i++) {
-    reply &= ~((_i2c.digitalRead(_button_pins[i])) << i);
-  }
-  return reply;
 }
